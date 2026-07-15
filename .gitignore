@@ -1,0 +1,19 @@
+# Secrets and tokens — never commit
+.env
+credentials.json
+client_secret*.json
+token.json
+
+# Runtime artifacts
+logs/
+__pycache__/
+.venv/
+calendar_report.json
+check_err.log
+
+# Local agent runtime files (not part of the project)
+CLAUDE.md
+.agent_context/
+.multica/
+.claude/
+check_calendar.py
