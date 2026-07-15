@@ -8,7 +8,8 @@ record deliberately reflect what you were actually working on. This tool syncs
 via the timer or tagged manually) into a dedicated Google Calendar, including
 task and focus/meeting session info:
 
-- One calendar event per qualifying time entry, titled `[Project] Task: summary`
+- One calendar event per qualifying time entry, titled `[Project] Task`,
+  with the entry's full description in the event body
 - Focus sessions are colored blue, meetings purple
 - Events are marked free (`transparent`) so they never block your availability
 - Idempotent: safe to re-run over any window, no duplicate events

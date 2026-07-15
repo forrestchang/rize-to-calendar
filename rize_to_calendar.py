@@ -116,14 +116,13 @@ def fetch_sessions(start, end):
     return [s for s in data["sessions"] if s["type"] in ("focus", "meeting")]
 
 
-def match_session(entry, sessions):
+def match_session(entry, parsed_sessions):
     """Return the focus/meeting session with the largest time overlap."""
     e_start = datetime.fromisoformat(entry["startTime"])
     e_end = datetime.fromisoformat(entry["endTime"])
     best, best_overlap = None, timedelta(0)
-    for s in sessions:
-        overlap = (min(e_end, datetime.fromisoformat(s["endTime"]))
-                   - max(e_start, datetime.fromisoformat(s["startTime"])))
+    for s_start, s_end, s in parsed_sessions:
+        overlap = min(e_end, s_end) - max(e_start, s_start)
         if overlap > best_overlap:
             best, best_overlap = s, overlap
     return best
@@ -178,15 +177,7 @@ def build_event(entry, session):
     client = entry["client"]["name"] if entry.get("client") else None
     desc = (entry.get("description") or entry.get("title") or "").strip()
 
-    head = desc.splitlines()[0] if desc else ""
-    if len(head) > 100:
-        head = head[:100] + "…"
-    if task and head:
-        summary = f"[{project}] {task}: {head}"
-    elif task:
-        summary = f"[{project}] {task}"
-    else:
-        summary = f"[{project}] {head or 'No description'}"
+    summary = f"[{project}] {task}" if task else f"[{project}]"
 
     lines = []
     if desc:
@@ -266,7 +257,9 @@ def needs_update(existing, desired):
 def sync(start, end, dry_run=False, delete_stale=True):
     entries = fetch_time_entries(start, end)
     qualified = [e for e in entries if e.get("project")]
-    sessions = fetch_sessions(start, end)
+    sessions = [(datetime.fromisoformat(s["startTime"]),
+                 datetime.fromisoformat(s["endTime"]), s)
+                for s in fetch_sessions(start, end)]
     log.info("Window %s → %s: %d entries, %d with a project, %d focus/meeting sessions",
              start.date(), end.date(), len(entries), len(qualified), len(sessions))
 
