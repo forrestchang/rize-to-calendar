@@ -116,6 +116,19 @@ def fetch_sessions(start, end):
     return [s for s in data["sessions"] if s["type"] in ("focus", "meeting")]
 
 
+def is_running(entry, now, grace):
+    """Whether a time entry is still in progress and must not be synced yet.
+
+    Rize's `status` stays "active" forever, so it can't tell a finished entry
+    from a running one. A running timer instead keeps its `endTime` pinned to
+    the present (it advances toward, and can even sit just past, "now"), while a
+    finished entry has an `endTime` fixed in the past. We treat an entry as
+    running until its `endTime` is at least `grace` behind now; it then gets
+    picked up on a later run once the timer has actually stopped.
+    """
+    return datetime.fromisoformat(entry["endTime"]) > now - grace
+
+
 def match_session(entry, parsed_sessions):
     """Return the focus/meeting session with the largest time overlap."""
     e_start = datetime.fromisoformat(entry["startTime"])
@@ -256,12 +269,18 @@ def needs_update(existing, desired):
 
 def sync(start, end, dry_run=False, delete_stale=True):
     entries = fetch_time_entries(start, end)
-    qualified = [e for e in entries if e.get("project")]
+    now = datetime.now(timezone.utc)
+    grace = timedelta(seconds=int(os.environ.get("SYNC_RUNNING_GRACE_SECONDS", "60")))
+    with_project = [e for e in entries if e.get("project")]
+    qualified = [e for e in with_project if not is_running(e, now, grace)]
+    running = len(with_project) - len(qualified)
     sessions = [(datetime.fromisoformat(s["startTime"]),
                  datetime.fromisoformat(s["endTime"]), s)
                 for s in fetch_sessions(start, end)]
-    log.info("Window %s → %s: %d entries, %d with a project, %d focus/meeting sessions",
-             start.date(), end.date(), len(entries), len(qualified), len(sessions))
+    log.info("Window %s → %s: %d entries, %d with a project "
+             "(%d still running, skipped), %d focus/meeting sessions",
+             start.date(), end.date(), len(entries), len(with_project),
+             running, len(sessions))
 
     svc = get_calendar_service()
     cal_id = get_calendar_id(svc)
